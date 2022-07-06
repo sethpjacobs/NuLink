@@ -24,12 +24,13 @@ Contributions are welcome :-) Read [CONTRIBUTING.md](CONTRIBUTING.md).
 ### Prerequisites
 
 - Linux, macOS, or Windows
-- .NET Core SDK 2.1+ (not tested on 3.0 yet)
+- .NET Core SDK 6.0+
 
 ### Installing
 
 ```
-$ dotnet tool install --global NuLink --version 0.1.0-beta2
+$ dotnet pack
+$ dotnet tool install --global --add-source ./nupkg NuLink
 ```
 
 ### Linking a package to local sources
@@ -231,6 +232,7 @@ Example. To manually remove a link for **My.Package** version **1.0.5**, do thes
 ## Authors
 
 - [Felix Berman](https://github.com/felix-b) - initial work
+- [Seth Jacobs](httpsL//github.com/sethpjacobs) - Project restructure and update to .net 6
 
 [Back to top](#NuLink)
 

@@ -33,7 +33,7 @@ To report a bug, file an issue that contains:
 
 You will need:
 
-- .NET Core SDK 2.1+ (not tested on 3.0)
+- .NET Core SDK 6.0+
 - C# IDE of your choice (Rider, VSCode, Visual Studio, etc).
 
 To build the cloned repo:
