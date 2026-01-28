@@ -8,8 +8,8 @@ namespace NuLink.Cli.ProjectStyles
     public abstract class ProjectStyle
     {
         public const string MsbuildNamespaceUri = "http://schemas.microsoft.com/developer/msbuild/2003";
-        
-        protected ProjectStyle(IUserInterface ui, ProjectAnalyzer project, XElement projectXml)
+
+        protected ProjectStyle(IUserInterface ui, IProjectAnalyzer project, XElement projectXml)
         {
             this.UI = ui;
             this.Project = project;
@@ -20,28 +20,22 @@ namespace NuLink.Cli.ProjectStyles
 
         protected IUserInterface UI { get; }
 
-        protected ProjectAnalyzer Project { get; }
+        protected IProjectAnalyzer Project { get; }
 
         protected XElement ProjectXml { get; }
 
-        public static ProjectStyle Create(IUserInterface ui, ProjectAnalyzer project)
+        public static ProjectStyle Create(IUserInterface ui, IProjectAnalyzer project)
         {
             var projectXml = XElement.Load(project.ProjectFile.Path);
 
-            var isSdkStyle = SdkProjectStyle.IsSdkStyleProject(projectXml);
-            var isOldStyle = OldProjectStyle.IsOldStyleProject(projectXml);
-
-            if (isSdkStyle && !isOldStyle)
+            if (!SdkProjectStyle.IsSdkStyleProject(projectXml))
             {
-                return new SdkProjectStyle(ui, project, projectXml);
+                throw new Exception(
+                    $"Only SDK-style projects are supported. Legacy .NET Framework projects (packages.config) " +
+                    $"are no longer supported: {project.ProjectFile.Path}");
             }
 
-            if (isOldStyle && !isSdkStyle)
-            {
-                return new OldProjectStyle(ui, project, projectXml);
-            }
-                
-            throw new Exception($"Error: could not recognize project style: {project.ProjectFile.Path}");
+            return new SdkProjectStyle(ui, project, projectXml);
         }
     }
 }

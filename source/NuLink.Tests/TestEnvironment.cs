@@ -26,7 +26,7 @@ namespace NuLink.Tests
             "NuLink.Cli",
             "bin",
             ConfigurationName,
-            "netcoreapp2.1",
+            "net10.0",
             "nulink.dll");
         public static string InstalledNuLinkBinaryPath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),

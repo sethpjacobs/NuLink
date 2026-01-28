@@ -14,7 +14,7 @@ namespace NuLink.Cli
             _ui = ui;
         }
 
-        public HashSet<PackageReferenceInfo> LoadPackageReferences(IEnumerable<ProjectAnalyzer> projects)
+        public HashSet<PackageReferenceInfo> LoadPackageReferences(IEnumerable<IProjectAnalyzer> projects)
         {
             var results = new HashSet<PackageReferenceInfo>();
 

@@ -52,7 +52,6 @@ namespace NuLink.Tests.Acceptance
 
     public enum TargetProjectKind
     {
-        NetCore,
-        NetFx
+        NetCore
     }
 }

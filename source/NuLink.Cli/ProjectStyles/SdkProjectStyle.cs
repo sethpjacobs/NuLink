@@ -12,7 +12,7 @@ namespace NuLink.Cli.ProjectStyles
 {
     public class SdkProjectStyle : ProjectStyle
     {
-        public SdkProjectStyle(IUserInterface ui, ProjectAnalyzer project, XElement projextXml)
+        public SdkProjectStyle(IUserInterface ui, IProjectAnalyzer project, XElement projextXml)
             : base(ui, project, projextXml)
         {
         }
@@ -20,41 +20,68 @@ namespace NuLink.Cli.ProjectStyles
         public override IEnumerable<PackageReferenceInfo> LoadPackageReferences()
         {
             var packagesRootFolder = GetPackagesRootFolder();
-            var packages = GetPackages();
-    
+            var projectDirectory = Path.GetDirectoryName(Project.ProjectFile.Path);
+
+            // Initialize CPM loader and check if project uses Central Package Management
+            var cpmLoader = new DirectoryPackagesPropsLoader(projectDirectory, UI);
+            var usesCpm = cpmLoader.ProjectUsesCpm(ProjectXml);
+
+            Dictionary<string, string> centralVersions = null;
+            if (usesCpm)
+            {
+                var propsPath = cpmLoader.FindDirectoryPackagesPropsPath();
+                centralVersions = cpmLoader.LoadPackageVersions(propsPath);
+                UI.ReportMedium(() => $"Project uses Central Package Management with {centralVersions.Count} package version(s)");
+            }
+
+            var packages = GetPackages(centralVersions);
             return packages.Where(p => p != null);
-                            
-            IEnumerable<PackageReferenceInfo> GetPackages()
+        }
+
+        private IEnumerable<PackageReferenceInfo> GetPackages(Dictionary<string, string> centralVersions)
+        {
+            var packagesRootFolder = GetPackagesRootFolder();
+            var elements = ProjectXml.XPathSelectElements("//PackageReference");
+
+            foreach (var element in elements)
             {
-                var elements = ProjectXml.XPathSelectElements("//PackageReference");
-                
-                return elements.Select(e => {
-                    var packageId = e.Attribute("Include")?.Value;
-                    var version = e.Attribute("Version")?.Value;
-    
-                    if (!String.IsNullOrWhiteSpace(packageId) && !String.IsNullOrWhiteSpace(version))
-                    {
-                        var folder = GetPackageFolder(packageId, version);
-                        return new PackageReferenceInfo(
-                            packageId, 
-                            version, 
-                            rootFolderPath: folder,
-                            libSubfolderPath: "lib");
-                    }
-    
-                    return null;
-                });
+                var packageId = element.Attribute("Include")?.Value;
+                if (string.IsNullOrWhiteSpace(packageId))
+                    continue;
+
+                // Version resolution order:
+                // 1. VersionOverride attribute (CPM escape hatch)
+                // 2. Version attribute on PackageReference
+                // 3. Central version from Directory.Packages.props
+                var version = element.Attribute("VersionOverride")?.Value
+                           ?? element.Attribute("Version")?.Value;
+
+                if (string.IsNullOrWhiteSpace(version) && centralVersions != null)
+                {
+                    centralVersions.TryGetValue(packageId, out version);
+                }
+
+                if (string.IsNullOrWhiteSpace(version))
+                {
+                    UI.ReportWarning(() => $"Could not determine version for package {packageId}");
+                    continue;
+                }
+
+                var folder = GetPackageFolder(packagesRootFolder, packageId, version);
+                yield return new PackageReferenceInfo(
+                    packageId,
+                    version,
+                    rootFolderPath: folder,
+                    libSubfolderPath: "lib");
             }
-    
-            string GetPackageFolder(string packageId, string version)
-            {
-                var packageFolderPath = Path.Combine(
-                    packagesRootFolder,
-                    packageId.ToLower(),
-                    version.ToLower());
-    
-                return packageFolderPath;
-            }
+        }
+
+        private string GetPackageFolder(string packagesRootFolder, string packageId, string version)
+        {
+            return Path.Combine(
+                packagesRootFolder,
+                packageId.ToLower(),
+                version.ToLower());
         }
     
         private string GetPackagesRootFolder()

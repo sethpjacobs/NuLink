@@ -4,37 +4,44 @@ NuLink allows consuming NuGet packages directly from source code on local machin
 
 [![Build status](https://ci.appveyor.com/api/projects/status/1fn8jkqoyrum4aiq/branch/master?svg=true)](https://ci.appveyor.com/project/felix-b/nulink) [![Nuget](https://img.shields.io/nuget/vpre/NuLink.svg)](https://www.nuget.org/packages/NuLink//)
 
-See also: [Usage instructions](#usage-instructions) | [Limitations & roadmap](#limitations-and-roadmap) | [Troubleshooting](#troubleshooting) | [Contributing](CONTRIBUTING.md) | [Acknowledgements](#Acknowledgements)
+See also: [Usage instructions](#usage-instructions) | [What's New](#whats-new-in-020) | [Limitations & roadmap](#limitations-and-roadmap) | [Troubleshooting](#troubleshooting) | [Contributing](CONTRIBUTING.md) | [Acknowledgements](#Acknowledgements)
 
 ## Current status
 
-The project is currently in beta. It already works for both .NET Core/NETStandard and .NET Framework packages and projects. Some combinations (OS, consumer style, package style) weren't yet tested. See [Limitations & roadmap](#limitations-and-roadmap) for details.
+The project supports SDK-style projects (.NET Core, .NET 5+, .NET Standard) including projects using Central Package Management (Directory.Packages.props).
 
 Please report bugs and suggestions in the repo [Issues](https://github.com/nwheels-io/NuLink/issues). If something goes wrong, see recovery steps in [Troubleshooting](#Troubleshooting).
 
 Contributions are welcome :-) Read [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## What's New in 0.2.0
+
+- **Central Package Management Support**: Full support for `Directory.Packages.props` - NuLink now correctly resolves package versions from centralized version files
+- **Updated to .NET 10**: The tool now requires .NET 10 runtime
+- **Removed .NET Framework Support**: Legacy `packages.config`-style projects are no longer supported. Please use SDK-style projects with PackageReference format
+- **Modern System.CommandLine**: Updated to the stable System.CommandLine 2.0 library
+
 ## Getting started
 
 ### Supported types of projects
 
-- .NET Core and NETStandard projects and packages (_"SDK/PackageReference-style"_)
-- **New in Beta 2**: .NET Framework projects and packages (_"packages.config-style"_)
+- SDK-style projects (.NET Core, .NET 5+, .NET Standard) with `PackageReference`
+- Projects using Central Package Management (`Directory.Packages.props`)
 
 ### Prerequisites
 
 - Linux, macOS, or Windows
-- .NET Core SDK 2.1+ (not tested on 3.0 yet)
+- .NET 10 SDK
 
 ### Installing
 
 ```
-$ dotnet tool install --global NuLink --version 0.1.0-beta2
+$ dotnet tool install --global NuLink --version 0.2.0
 ```
 
 ### Linking a package to local sources
 
-Prior to linking, make sure these conditions are met: 
+Prior to linking, make sure these conditions are met:
 
 - package must be first restored from a NuGet feed (this limitation will be removed in upcoming versions)
 - package source project must be located on the local machine
@@ -53,9 +60,9 @@ See [Usage instructions](#Usage-instructions) for more info.
 
 ## How it works
 
-NuLink creates symbolic links to consume binaries of selected packages directly from their compilation directories in the local file system. 
+NuLink creates symbolic links to consume binaries of selected packages directly from their compilation directories in the local file system.
 
-### For SDK/PackageReference-style projects (.NET Core or NETStandard)
+### For SDK/PackageReference-style projects
 
 ```
 Original                      Linked
@@ -63,11 +70,11 @@ Original                      Linked
 ~ or %UserProfile%            working directory
 |                             |
 +- .nuget/                    +- My.Package/
-   |                             | 
+   |                             |
    +- packages/                  +- Source/
       |                             |
-      +- my.package/                +- My.Package.csproj     
-         |                          |  
+      +- my.package/                +- My.Package.csproj
+         |                          |
          +- 1.0.5/                  +- bin/
             |                          |
             +- lib >---> SYMLINK >---> +- Debug/
@@ -77,33 +84,38 @@ Original                      Linked
 
 In this example, every time `My.Package.csproj` is compiled, the latest binaries from its `bin/Debug` are automatically used by all consumers. Since .pdb in `bin/Debug` maps the binaries to local sources, code navigation and debugging on consumer side work seamlessly with the latest changes in package code.
 
-### For packages.config-style projects (.NET Framework)
+### Central Package Management (Directory.Packages.props)
 
-```
-Original                        Linked
---------------------            ----------------------
-consumer working directory    
-| 
-+- Source\                      package working directory    
-   |                            | 
-   +- consumer-solution.sln     +- My.Package
-   |                               |
-   +- packages\                    +- Source\
-      |                               |
-      +- My.Package.1.0.5\            +- My.Package.csproj     
-         |                            |  
-         +- lib\                      +- bin\
-            |                            |
-            +- net45 >---> SYMLINK >---> +- Debug\
+NuLink fully supports projects using Central Package Management. When your consumer project uses `Directory.Packages.props` for centralized version management:
+
+1. NuLink searches up the directory tree to find `Directory.Packages.props`
+2. Package versions are resolved from `<PackageVersion>` elements
+3. The `VersionOverride` attribute in `PackageReference` is respected
+
+Example `Directory.Packages.props`:
+```xml
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="My.Package" Version="1.0.5" />
+  </ItemGroup>
+</Project>
 ```
 
-This example works mostly like the previous one, except that the link only affects a specific consumer solution. This is because in .NET Framework projects, packages are copied under a solution-level `packages` folder, whereas in the new SDK-style projects, .NET looks for packages in the user-level cache.
+Example consumer `.csproj` (no version needed):
+```xml
+<ItemGroup>
+  <PackageReference Include="My.Package" />
+</ItemGroup>
+```
 
 [Back to top](#NuLink)
 
 ## Why would you use it
 
-Say you've found a piece of code that's a perfect candidate to become a reusable package. So you create a class library project, configure it to be packed for NuGet, and move the code there. 
+Say you've found a piece of code that's a perfect candidate to become a reusable package. So you create a class library project, configure it to be packed for NuGet, and move the code there.
 
 That's all great, but now when making changes in the package, how do you try them out in your main project? Publishing a new version to NuGet every time you want to test your new lines of code just doesn't cut it.
 
@@ -115,19 +127,17 @@ In Node community this problem is long solved with symlinks using **[npm link](h
 
 ## Limitations and roadmap
 
-Supporting the full variety of NuGet setups and workflows is hardly feasible. NuLink will initially support the more straightforward workflows, as listed in the table below. Eventually, support for more scenarios can be added. 
+Supporting the full variety of NuGet setups and workflows is hardly feasible. NuLink supports the more straightforward workflows, as listed in the table below.
 
-Limitation|Roadmap
+Limitation|Status
 ---|---
-**RESOLVED! 0.1.0-beta2:** NuLink now supports both SDK/PackageReference-style projects (.NET Core/NETStandard) and Old/packasges.config-style projects (.NET Framework)|[#2 Add support for .NET Framework projects](https://github.com/nwheels-io/NuLink/issues/2)
-Not tested on .NET Core 3.0|[#3 Test on .NET Core 3.0](https://github.com/nwheels-io/NuLink/issues/3)
+.NET Framework projects (packages.config-style) are no longer supported|Removed in 0.2.0. Use SDK-style projects with PackageReference
 Consumer projects must be C# (.csproj)|[#4 Support projects in more languages](https://github.com/nwheels-io/NuLink/issues/4)
 The `--dry-run` option is not implemented|[#19 Implement dry run](https://github.com/nwheels-io/NuLink/issues/19)
 Symbolic link is always created to `bin/Debug` of the package, regardless of existing/desired build configuration|[#5 Add ability to detect and select package configuration](https://github.com/nwheels-io/NuLink/issues/5)
-A package that's being developed and wasn't yet pushed to any NuGet feed, cannot be linked. This is because packages root folder (`~/.nuget/packages/`) must contain an entry for the package.|[#12 Allow linking unpushed packages by first automatically restoring them from temporary local feed](https://github.com/nwheels-io/NuLink/issues/12).
+A package that's being developed and wasn't yet pushed to any NuGet feed, cannot be linked.|[#12 Allow linking unpushed packages](https://github.com/nwheels-io/NuLink/issues/12)
 Packages must be linked one by one|[#6 Add ability to link multiple referenced packages at once](https://github.com/nwheels-io/NuLink/issues/6)
-Package `lib` folder must be result of compiling a single project (e.g. automatic packaging of project on build). Packages with arbitrary contents of `lib` achieved with manually authored `.nuspec` are not supported.|Complex to solve ([#7](https://github.com/nwheels-io/NuLink/issues/7)). Wait to see if there's enough demand
-For SDK-style consumer projects, the effect of symbolic link is machine-wide. It is not per consuming project/solution|Probably won't fix ([#8](https://github.com/nwheels-io/NuLink/issues/8))
+For SDK-style consumer projects, the effect of symbolic link is machine-wide|Probably won't fix ([#8](https://github.com/nwheels-io/NuLink/issues/8))
 
 [Back to top](#NuLink)
 
@@ -137,7 +147,7 @@ For SDK-style consumer projects, the effect of symbolic link is machine-wide. It
 
 Install:
 ```
-$ dotnet tool install -g NuLink --version 0.1.0-beta2
+$ dotnet tool install -g NuLink --version 0.2.0
 ```
 
 After the installation, the tool can be run from terminal with `nulink` command.
@@ -174,7 +184,7 @@ To revert symbolic link on a package, go to consumer project or solution directo
 $ nulink unlink -p My.Package
 ```
 
-### Get help 
+### Get help
 
 To list existing commands:
 
@@ -219,7 +229,7 @@ Windows:
 Example. To manually remove a link for **My.Package** version **1.0.5**, do these steps:
 
 - Go to package version folder, usually `~/.nuget/packages/My.Package/1.0.5` on macOS and Linux, or `%UserProfile%\.nuget\packages\My.Package\1.0.5` on Windows
-  - To verify the exact location of packages root folder,  go to one of the consuming projects. In the `obj`   directory, find a file with extension `.nuget.g.props`. In that file, find `<NuGetPackageRoot>` element, specifying packages root folder. From that folder, descend into -> `My.Package` -> `1.0.5`. 
+  - To verify the exact location of packages root folder,  go to one of the consuming projects. In the `obj`   directory, find a file with extension `.nuget.g.props`. In that file, find `<NuGetPackageRoot>` element, specifying packages root folder. From that folder, descend into -> `My.Package` -> `1.0.5`.
 - List files in directory (`ls` or `dir`). Make sure you find:
   - `lib` directory symlink pointing to `bin/Debug` of package source folder
   - `nulink-backup.lib` directory. This is the original `lib` directory before creation of symlink.
@@ -231,6 +241,7 @@ Example. To manually remove a link for **My.Package** version **1.0.5**, do thes
 ## Authors
 
 - [Felix Berman](https://github.com/felix-b) - initial work
+- [Seth Jacobs](https://github.com/sethjacobs) - .NET 10 upgrade and CPM support
 
 [Back to top](#NuLink)
 

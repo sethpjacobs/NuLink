@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
-using Microsoft.VisualStudio.TestPlatform.ObjectModel.Client;
 using Murphy.SymbolicLink;
 using NuLink.Cli;
 using NUnit.Framework;
@@ -233,11 +230,6 @@ namespace NuLink.Tests.Acceptance
         public static IEnumerable<AcceptanceTestTarget> GetSupportedTargets()
         {
             yield return AcceptanceTestTarget.NetCore;
-            
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                yield return AcceptanceTestTarget.NetFx;
-            }
         }
     }
 }
